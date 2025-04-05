@@ -21,24 +21,28 @@ def scrape_top_articles(topic="all", trending_period="week", top_n=10):
         pd.DataFrame: A DataFrame containing the scraped data with columns including:
                       title and URL.
     """
-
+    # URL construction
     url = BASE_URL
     if topic != "all":
         url += f"/t/{topic}"
-    url += f"/top/{trending_period}"
+    if trending_period != "day":
+        url += f"/top/{trending_period}"
 
-
+    # Initialize variables
     metadata_list = []
 
     # Start scraping
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
 
-        # Default context (user-agent) for the main page
+        # Default user-agent context for the main page
         main_context = browser.new_context()
         page = main_context.new_page()
-        page.goto(url, timeout=60000)
+        page.goto(url, timeout=10000)
+        # Wait for dynamic content to load (until network is almost idle)
         page.wait_for_load_state("networkidle")
+        print(f"Starting scraper to retrieve the top {top_n} DEV.to articles "
+              f"for topic/tag '{topic}' and trending period '{trending_period}'")
 
         # Infinite scroll to load top_n articles
         articles = page.query_selector_all("article.crayons-story")
@@ -56,9 +60,10 @@ def scrape_top_articles(topic="all", trending_period="week", top_n=10):
         top_articles = articles[:top_n]
 
         # Extract metadata from each article
-        for article in top_articles:
+        for i, article in enumerate(top_articles):
             try:
                 metadata = extract_article_metadata(article)
+                print(f"Scraped metadata of article {i + 1}: {metadata.get('title')}")
                 metadata_list.append(metadata)
             except Exception as e:
                 print(f"Error extracting metadata from an article: {e}")
